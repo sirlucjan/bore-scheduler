@@ -4365,18 +4365,17 @@ int wake_up_state(struct task_struct *p, unsigned int state)
 }
 
 #ifdef CONFIG_SCHED_BORE
-static inline void sched_on_fork_calc_prev_burst_from_siblings(struct task_struct *p)
+static inline void sched_fork_update_prev_burst(struct task_struct *p)
 {
 	struct task_struct *sib;
-	u64 sum = 0, avg = 0;
 	u32 cnt = 0;
+	u64 sum = 0, avg = 0;
 	list_for_each_entry(sib, &p->sibling, sibling) {
 		cnt++;
-		sum += sib->se.prev_burst_time;
+		sum += sib->se.prev_burst_time >> 8;
 	}
-	if (cnt) avg = sum / cnt;
-	p->se.prev_burst_time = max(p->se.prev_burst_time, avg);
-	p->se.burst_time = 0;
+	if (cnt) avg = (sum / cnt) << 8;
+	if (p->se.prev_burst_time < avg) p->se.prev_burst_time = avg;
 }
 #endif // CONFIG_SCHED_BORE
 
@@ -4614,7 +4613,8 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 {
 	__sched_fork(clone_flags, p);
 #ifdef CONFIG_SCHED_BORE
-	sched_on_fork_calc_prev_burst_from_siblings(p);
+	sched_fork_update_prev_burst(p);
+	p->se.burst_time = 0;
 #endif // CONFIG_SCHED_BORE
 	/*
 	 * We mark the process as NEW here. This guarantees that
@@ -9700,7 +9700,7 @@ void __init sched_init(void)
 #endif
 
 #ifdef CONFIG_SCHED_BORE
-	printk(KERN_INFO "BORE (Burst-Oriented Response Enhancer) CPU Scheduler modification 1.7.6 by Masahito Suzuki");
+	printk(KERN_INFO "BORE (Burst-Oriented Response Enhancer) CPU Scheduler modification 1.7.7 by Masahito Suzuki");
 #endif // CONFIG_SCHED_BORE
 
 	wait_bit_init();
