@@ -4374,7 +4374,7 @@ static inline void sched_fork_update_prev_burst(struct task_struct *p)
 		cnt++;
 		sum += sib->se.prev_burst_time >> 8;
 	}
-	if (cnt) avg = do_div(sum, cnt) << 8;
+	if (cnt) avg = div_u64(sum, cnt) << 8;
 	if (p->se.prev_burst_time < avg) p->se.prev_burst_time = avg;
 }
 #endif // CONFIG_SCHED_BORE
@@ -9700,7 +9700,7 @@ void __init sched_init(void)
 #endif
 
 #ifdef CONFIG_SCHED_BORE
-	printk(KERN_INFO "BORE (Burst-Oriented Response Enhancer) CPU Scheduler modification 1.7.8 by Masahito Suzuki");
+	printk(KERN_INFO "BORE (Burst-Oriented Response Enhancer) CPU Scheduler modification 1.7.9 by Masahito Suzuki");
 #endif // CONFIG_SCHED_BORE
 
 	wait_bit_init();
