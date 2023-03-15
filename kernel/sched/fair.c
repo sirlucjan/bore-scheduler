@@ -933,7 +933,7 @@ static inline void update_burst_score(struct sched_entity *se) {
 	s32 bits;
 	u32 intgr, fdigs, dec10;
 	
-	burst_time = max(se->burst_time, se->prev_burst_time);
+	burst_time = max(se->prev_burst_time, se->burst_time);
 	bits = fls64(burst_time);
 	intgr = max((u32)bits, sched_burst_granularity) - sched_burst_granularity;
 	fdigs = max(bits - 1, (s32)sched_burst_granularity);
@@ -945,15 +945,11 @@ static u64 burst_scale(u64 delta, struct sched_entity *se) {
 	return mul_u64_u32_shr(delta, sched_prio_to_wmult[se->burst_score], 22);
 }
 
-static u64 calc_delta_fair_bscale(u64 delta, struct sched_entity *se) {
-	return burst_scale(calc_delta_fair(delta, se), se);
-}
-
 static inline u64 binary_smooth(u64 old, u64 new, unsigned int smoothness) {
 	return (new + old * ((1 << smoothness) - 1)) >> smoothness;
 }
 
-static inline void reset_burst(struct sched_entity *se) {
+static void reset_burst(struct sched_entity *se) {
 	se->prev_burst_time = binary_smooth(
 		se->prev_burst_time, se->burst_time, sched_burst_smoothness);
 	se->burst_time = 0;
@@ -993,7 +989,7 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	curr->burst_time += delta_exec;
 	update_burst_score(curr);
 	if (sched_bore & 1)
-		curr->vruntime += calc_delta_fair_bscale(delta_exec, curr);
+		curr->vruntime += burst_scale(calc_delta_fair(delta_exec, curr), curr);
 	else
 #endif // CONFIG_SCHED_BORE
 	curr->vruntime += calc_delta_fair(delta_exec, curr);
