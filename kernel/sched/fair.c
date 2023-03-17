@@ -968,6 +968,8 @@ static void reset_burst(struct sched_entity *se) {
 	se->prev_burst_time = binary_smooth(
 		se->prev_burst_time, se->burst_time, sched_burst_smoothness);
 	se->burst_time = 0;
+
+	se->max_burst_time = se->prev_burst_time;
 }
 #endif // CONFIG_SCHED_BORE
 
@@ -1002,6 +1004,7 @@ static void update_curr(struct cfs_rq *cfs_rq)
 
 #ifdef CONFIG_SCHED_BORE
 	curr->burst_time += delta_exec;
+	curr->max_burst_time = max(curr->max_burst_time, curr->burst_time);
 	update_burst_score(curr);
 	if (sched_bore & 1)
 		curr->vruntime += penalty_scale(calc_delta_fair(delta_exec, curr), curr);
