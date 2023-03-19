@@ -130,10 +130,11 @@ static unsigned int normalized_sysctl_sched_wakeup_granularity	= 1000000UL;
 const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
 
 #ifdef CONFIG_SCHED_BORE
-unsigned int __read_mostly sched_bore                = 1;
-unsigned int __read_mostly sched_burst_penalty_scale = 1280;
-unsigned int __read_mostly sched_burst_granularity   = 12;
-unsigned int __read_mostly sched_burst_smoothness    = 2;
+unsigned int __read_mostly sched_bore                 = 3;
+unsigned int __read_mostly sched_burst_penalty_offset = 12;
+unsigned int __read_mostly sched_burst_penalty_scale  = 1280;
+unsigned int __read_mostly sched_burst_preempt_offset = 16;
+unsigned int __read_mostly sched_burst_smoothness     = 2;
 static int three          = 3;
 static int sixty_four     = 64;
 static int maxval_12_bits = 4095;
@@ -204,6 +205,15 @@ static struct ctl_table sched_fair_sysctls[] = {
 		.extra2		= &three,
 	},
 	{
+		.procname	= "sched_burst_penalty_offset",
+		.data		= &sched_burst_penalty_offset,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= &sixty_four,
+	},
+	{
 		.procname	= "sched_burst_penalty_scale",
 		.data		= &sched_burst_penalty_scale,
 		.maxlen		= sizeof(unsigned int),
@@ -213,8 +223,8 @@ static struct ctl_table sched_fair_sysctls[] = {
 		.extra2		= &maxval_12_bits,
 	},
 	{
-		.procname	= "sched_burst_granularity",
-		.data		= &sched_burst_granularity,
+		.procname	= "sched_burst_preempt_offset",
+		.data		= &sched_burst_preempt_offset,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_minmax,
@@ -928,21 +938,26 @@ static void update_tg_load_avg(struct cfs_rq *cfs_rq)
 #endif /* CONFIG_SMP */
 
 #ifdef CONFIG_SCHED_BORE
-static inline void update_burst_score(struct sched_entity *se) {
-	u64 burst_time;
-	s32 bits;
-	u32 intgr, fdigs, dec10;
+static void update_burst_score(struct sched_entity *se) {
+	u32 pen10, pre10;
+	u64 burst_time = se->max_burst_time;
+	s32 bits = fls64(burst_time);
+	u32 fdigs = max(0, bits - 1);
+	s32 dec10 = (bits << 10) | (burst_time << (64 - fdigs) >> 54);
+
+	pen10 = max(0, dec10 - (s32)(sched_burst_penalty_offset << 10));
+	se->penalty_score = min((u32)39, pen10 * sched_burst_penalty_scale >> 20);
 	
-	burst_time = max(se->prev_burst_time, se->burst_time);
-	bits = fls64(burst_time);
-	intgr = max((u32)bits, sched_burst_granularity) - sched_burst_granularity;
-	fdigs = max(bits - 1, (s32)sched_burst_granularity);
-	dec10 = (intgr << 10) | (burst_time << (64 - fdigs) >> 54);
-	se->burst_score = min((u32)39, dec10 * sched_burst_penalty_scale >> 20);
+	pre10 = max(pen10, (sched_burst_preempt_offset << 10));
+	se->preempt_score = min((u32)39, pre10 * sched_burst_penalty_scale >> 20);
 }
 
-static u64 burst_scale(u64 delta, struct sched_entity *se) {
-	return mul_u64_u32_shr(delta, sched_prio_to_wmult[se->burst_score], 22);
+static inline u64 penalty_scale(u64 delta, struct sched_entity *se) {
+	return mul_u64_u32_shr(delta, sched_prio_to_wmult[se->penalty_score], 22);
+}
+
+static inline u64 preempt_scale(u64 delta, struct sched_entity *se) {
+	return mul_u64_u32_shr(delta, sched_prio_to_wmult[se->preempt_score], 22);
 }
 
 static inline u64 binary_smooth(u64 old, u64 new, unsigned int smoothness) {
@@ -989,7 +1004,7 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	curr->burst_time += delta_exec;
 	update_burst_score(curr);
 	if (sched_bore & 1)
-		curr->vruntime += burst_scale(calc_delta_fair(delta_exec, curr), curr);
+		curr->vruntime += penalty_scale(calc_delta_fair(delta_exec, curr), curr);
 	else
 #endif // CONFIG_SCHED_BORE
 	curr->vruntime += calc_delta_fair(delta_exec, curr);
@@ -5086,9 +5101,10 @@ set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 static int
 wakeup_preempt_entity_bscale(struct sched_entity *curr,
                              struct sched_entity *se, bool do_scale);
-#endif // CONFIG_SCHED_BORE
+#else
 static int
 wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
+#endif // CONFIG_SCHED_BORE
 
 /*
  * Pick the next process, keeping these things in mind, in this order:
@@ -5127,13 +5143,18 @@ pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 				second = curr;
 		}
 
+#ifdef CONFIG_SCHED_BORE
+		if (second && wakeup_preempt_entity_bscale(
+			second, left, sched_bore & 2) < 1)
+#else // CONFIG_SCHED_BORE
 		if (second && wakeup_preempt_entity(second, left) < 1)
+#endif // CONFIG_SCHED_BORE
 			se = second;
 	}
 
 #ifdef CONFIG_SCHED_BORE
 	if (cfs_rq->next && wakeup_preempt_entity_bscale(
-		                  cfs_rq->next, left, sched_bore & 2) < 1)
+		cfs_rq->next, left, sched_bore & 2) < 1)
 #else // CONFIG_SCHED_BORE
 	if (cfs_rq->next && wakeup_preempt_entity(cfs_rq->next, left) < 1)
 #endif // CONFIG_SCHED_BORE
@@ -5142,7 +5163,14 @@ pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 		 * Someone really wants this to run. If it's not unfair, run it.
 		 */
 		se = cfs_rq->next;
-	} else if (cfs_rq->last && wakeup_preempt_entity(cfs_rq->last, left) < 1) {
+	}
+#ifdef CONFIG_SCHED_BORE
+	else if (cfs_rq->last && wakeup_preempt_entity_bscale(
+		cfs_rq->last, left, sched_bore & 2) < 1)
+#else // CONFIG_SCHED_BORE
+	else if (cfs_rq->last && wakeup_preempt_entity(cfs_rq->last, left) < 1)
+#endif // CONFIG_SCHED_BORE
+	{
 		/*
 		 * Prefer last buddy, try to return the CPU to a preempted task.
 		 */
@@ -7664,19 +7692,13 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 
 	gran = wakeup_gran(se);
 #ifdef CONFIG_SCHED_BORE
-	if (do_scale) gran = burst_scale(gran, se);
+	if (do_scale) gran = preempt_scale(gran, se);
 #endif // CONFIG_SCHED_BORE
 	if (vdiff > gran)
 		return 1;
 
 	return 0;
 }
-#ifdef CONFIG_SCHED_BORE
-static int wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
-{
-	return wakeup_preempt_entity_bscale(curr, se, false);
-}
-#endif // CONFIG_SCHED_BORE
 
 static void set_last_buddy(struct sched_entity *se)
 {

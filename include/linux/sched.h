@@ -558,7 +558,8 @@ struct sched_entity {
 #ifdef CONFIG_SCHED_BORE
 	u64				prev_burst_time;
 	u64				burst_time;
-	u8				burst_score;
+	u8				penalty_score;
+	u8				preempt_score;
 #endif // CONFIG_SCHED_BORE
 
 	u64				nr_migrations;
