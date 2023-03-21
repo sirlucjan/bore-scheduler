@@ -941,14 +941,14 @@ static void update_tg_load_avg(struct cfs_rq *cfs_rq)
 static void update_burst_score(struct sched_entity *se) {
 	u32 pen10, pre10;
 	u64 burst_time = se->max_burst_time;
-	s32 bits = fls64(burst_time);
-	u32 fdigs = max(0, bits - 1);
-	s32 dec10 = (bits << 10) | (burst_time << (64 - fdigs) >> 54);
+	u32 bits = fls64(burst_time);
+	u32 fdigs = likely(bits) && bits - 1;
+	s32 bits10 = (bits << 10) | (burst_time << (64 - fdigs) >> 54);
 
-	pen10 = max(0, dec10 - (s32)(sched_burst_penalty_offset << 10));
+	pen10 = max(0, bits10 - (s32)(sched_burst_penalty_offset << 10));
 	se->penalty_score = min((u32)39, pen10 * sched_burst_penalty_scale >> 20);
 	
-	pre10 = max(pen10, (sched_burst_preempt_offset << 10));
+	pre10 = max(pen10, sched_burst_preempt_offset << 10);
 	se->preempt_score = min((u32)39, pre10 * sched_burst_penalty_scale >> 20);
 }
 

@@ -4376,6 +4376,7 @@ static inline void adjust_prev_burst(struct task_struct *p)
 	}
 	if (cnt) avg = div_u64(sum, cnt) << 8;
 	if (p->se.prev_burst_time < avg) p->se.prev_burst_time = avg;
+	p->se.max_burst_time = p->se.prev_burst_time;
 }
 #endif // CONFIG_SCHED_BORE
 
@@ -4614,7 +4615,6 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 	__sched_fork(clone_flags, p);
 #ifdef CONFIG_SCHED_BORE
 	adjust_prev_burst(p);
-	p->se.max_burst_time = p->se.prev_burst_time;
 #endif // CONFIG_SCHED_BORE
 	/*
 	 * We mark the process as NEW here. This guarantees that
