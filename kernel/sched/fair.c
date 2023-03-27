@@ -132,9 +132,9 @@ const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
 #ifdef CONFIG_SCHED_BORE
 unsigned int __read_mostly sched_bore                 = 3;
 unsigned int __read_mostly sched_burst_penalty_offset = 12;
-unsigned int __read_mostly sched_burst_penalty_scale  = 1542;
+unsigned int __read_mostly sched_burst_penalty_scale  = 1292;
 unsigned int __read_mostly sched_burst_preempt_offset = 16;
-unsigned int __read_mostly sched_burst_smoothness     = 2;
+unsigned int __read_mostly sched_burst_smoothness     = 1;
 static int three          = 3;
 static int sixty_four     = 64;
 static int maxval_12_bits = 4095;
