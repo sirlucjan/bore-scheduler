@@ -942,7 +942,7 @@ static void update_burst_score(struct sched_entity *se) {
 	u32 pen10, pre10;
 	u64 burst_time = se->max_burst_time;
 	u32 bits = fls64(burst_time);
-	u32 fdigs = likely(bits) && bits - 1;
+	u32 fdigs = likely(bits) ? bits - 1 : 0;
 	s32 bits10 = (bits << 10) | (burst_time << (64 - fdigs) >> 54);
 
 	pen10 = max(0, bits10 - (s32)(sched_burst_penalty_offset << 10));
