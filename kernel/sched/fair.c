@@ -5104,7 +5104,7 @@ set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 static int
 wakeup_preempt_entity_bscale(struct sched_entity *curr,
                              struct sched_entity *se, bool do_scale);
-#else
+#else // CONFIG_SCHED_BORE
 static int
 wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
 #endif // CONFIG_SCHED_BORE
