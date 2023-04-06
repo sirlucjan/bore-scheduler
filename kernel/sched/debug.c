@@ -549,7 +549,6 @@ print_task(struct seq_file *m, struct rq *rq, struct task_struct *p)
 
 #ifdef CONFIG_SCHED_BORE
 	SEQ_printf(m, " %2d", p->se.penalty_score);
-	SEQ_printf(m, " %2d", p->se.preempt_score);
 #endif
 #ifdef CONFIG_NUMA_BALANCING
 	SEQ_printf(m, " %d %d", task_node(p), task_numa_group_id(p));

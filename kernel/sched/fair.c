@@ -133,7 +133,6 @@ const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
 unsigned int __read_mostly sched_bore                 = 3;
 unsigned int __read_mostly sched_burst_penalty_offset = 12;
 unsigned int __read_mostly sched_burst_penalty_scale  = 1292;
-unsigned int __read_mostly sched_burst_preempt_offset = 23;
 unsigned int __read_mostly sched_burst_smoothness     = 1;
 static int three          = 3;
 static int sixty_four     = 64;
@@ -221,15 +220,6 @@ static struct ctl_table sched_fair_sysctls[] = {
 		.proc_handler	= &proc_dointvec_minmax,
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= &maxval_12_bits,
-	},
-	{
-		.procname	= "sched_burst_preempt_offset",
-		.data		= &sched_burst_preempt_offset,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_minmax,
-		.extra1		= SYSCTL_ZERO,
-		.extra2		= &sixty_four,
 	},
 	{
 		.procname	= "sched_burst_smoothness",
@@ -952,15 +942,17 @@ static inline u32 __calc_burst_score(u32 bits10, u32 offset) {
 static void update_burst_score(struct sched_entity *se) {
 	u32 bits10 = __calc_bits10(se->max_burst_time);
 	se->penalty_score = __calc_burst_score(bits10, sched_burst_penalty_offset);
-	se->preempt_score = __calc_burst_score(bits10, sched_burst_preempt_offset);
 }
 
 static inline u64 penalty_scale(u64 delta, struct sched_entity *se) {
 	return mul_u64_u32_shr(delta, sched_prio_to_wmult[se->penalty_score], 22);
 }
 
-static inline u64 preempt_scale(u64 delta, struct sched_entity *se) {
-	return mul_u64_u32_shr(delta, sched_prio_to_wmult[se->preempt_score], 22);
+static inline u64 preempt_scale(
+	u64 delta, struct sched_entity *curr, struct sched_entity *se) {
+
+	u32 score = 20 + max(0, (s32)se->penalty_score - (s32)curr->penalty_score);
+	return mul_u64_u32_shr(delta, sched_prio_to_wmult[min(39, score)], 22);
 }
 
 static inline u64 binary_smooth(u64 old, u64 new, unsigned int smoothness) {
@@ -7698,7 +7690,7 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 
 	gran = wakeup_gran(se);
 #ifdef CONFIG_SCHED_BORE
-	if (do_scale) gran = preempt_scale(gran, se);
+	if (do_scale) gran = preempt_scale(gran, curr, se);
 #endif // CONFIG_SCHED_BORE
 	if (vdiff > gran)
 		return 1;
