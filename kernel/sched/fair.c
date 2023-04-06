@@ -951,8 +951,8 @@ static inline u64 penalty_scale(u64 delta, struct sched_entity *se) {
 static inline u64 preempt_scale(
 	u64 delta, struct sched_entity *curr, struct sched_entity *se) {
 
-	u32 score = 20 + max(0, (s32)se->penalty_score - (s32)curr->penalty_score);
-	return mul_u64_u32_shr(delta, sched_prio_to_wmult[min(39, score)], 22);
+	u32 score = max(0, (s32)se->penalty_score - (s32)curr->penalty_score) >> 1;
+	return mul_u64_u32_shr(delta, sched_prio_to_wmult[min(39, 20 + score)], 22);
 }
 
 static inline u64 binary_smooth(u64 old, u64 new, unsigned int smoothness) {
