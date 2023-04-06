@@ -938,18 +938,21 @@ static void update_tg_load_avg(struct cfs_rq *cfs_rq)
 #endif /* CONFIG_SMP */
 
 #ifdef CONFIG_SCHED_BORE
-static void update_burst_score(struct sched_entity *se) {
-	u32 pen10, pre10;
-	u64 burst_time = se->max_burst_time;
+static inline u32 __calc_bits10(u64 burst_time) {
 	u32 bits = fls64(burst_time);
 	u32 fdigs = likely(bits) ? bits - 1 : 0;
-	s32 bits10 = (bits << 10) | (burst_time << (64 - fdigs) >> 54);
+	return (bits << 10) | (burst_time << (64 - fdigs) >> 54);
+}
 
-	pen10 = max(0, bits10 - (s32)(sched_burst_penalty_offset << 10));
-	se->penalty_score = min((u32)39, pen10 * sched_burst_penalty_scale >> 20);
-	
-	pre10 = max(pen10, sched_burst_preempt_offset << 10);
-	se->preempt_score = min((u32)39, pre10 * sched_burst_penalty_scale >> 20);
+static inline u32 __calc_burst_score(u32 bits10, u32 offset) {
+	u32 val10 = max((s32)0, (s32)bits10 - (s32)(offset << 10));
+	return min((u32)39, val10 * sched_burst_penalty_scale >> 20);
+}
+
+static void update_burst_score(struct sched_entity *se) {
+	u32 bits10 = __calc_bits10(se->max_burst_time);
+	se->penalty_score = __calc_burst_score(bits10, sched_burst_penalty_offset);
+	se->preempt_score = __calc_burst_score(bits10, sched_burst_preempt_offset);
 }
 
 static inline u64 penalty_scale(u64 delta, struct sched_entity *se) {
