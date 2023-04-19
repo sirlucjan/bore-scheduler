@@ -4365,19 +4365,34 @@ int wake_up_state(struct task_struct *p, unsigned int state)
 }
 
 #ifdef CONFIG_SCHED_BORE
-static inline void adjust_prev_burst(struct task_struct *p)
-{
+extern unsigned int sched_burst_cache_lifetime;
+
+static inline void update_burst_cache(struct task_struct *p) {
 	u32 cnt = 0;
 	u64 sum = 0, avg = 0;
-	struct task_struct *sib;
-	list_for_each_entry(sib, &p->sibling, sibling) {
+	struct task_struct *child;
+	list_for_each_entry(child, &p->children, sibling) {
 		cnt++;
-		sum += sib->se.max_burst_time >> 8;
+		sum += child->se.max_burst_time >> 8;
 	}
 	if (cnt) avg = div_u64(sum, cnt) << 8;
-	if (p->se.prev_burst_time < avg) p->se.prev_burst_time = avg;
-	p->se.max_burst_time = p->se.prev_burst_time;
+	p->child_burst_cache = max(avg, p->se.max_burst_time);
 }
+
+static void adjust_prev_burst(struct task_struct *p) {
+	struct task_struct *parent = p->parent;
+	u64 ktime = ktime_to_ns(ktime_get());
+
+	if (likely(parent)) {
+		if (parent->child_burst_last_cached + sched_burst_cache_lifetime < ktime) {
+			parent->child_burst_last_cached = ktime;
+			update_burst_cache(parent);
+		}
+		if (p->se.prev_burst_time < parent->child_burst_cache)
+			p->se.prev_burst_time = parent->child_burst_cache;
+	}
+	p->se.max_burst_time = p->se.prev_burst_time;
+} 
 #endif // CONFIG_SCHED_BORE
 
 /*

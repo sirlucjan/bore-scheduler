@@ -995,6 +995,10 @@ struct task_struct {
 	struct list_head		children;
 	struct list_head		sibling;
 	struct task_struct		*group_leader;
+#ifdef CONFIG_SCHED_BORE
+	u64	child_burst_cache;
+	u64	child_burst_last_cached;
+#endif // CONFIG_SCHED_BORE
 
 	/*
 	 * 'ptraced' is the list of tasks this task is using ptrace() on.
