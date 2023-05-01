@@ -943,8 +943,8 @@ static inline u32 __calc_bits10(u64 burst_time) {
 }
 
 static inline u32 __calc_burst_score(u32 bits10, u32 offset) {
-	u32 val10 = max((s32)0, (s32)bits10 - (s32)(offset << 10));
-	return min((u32)39, val10 * sched_burst_penalty_scale >> 20);
+	u32 val10 = max(0, (s32)bits10 - (s32)(offset << 10));
+	return min(39U, val10 * sched_burst_penalty_scale >> 20);
 }
 
 static void update_burst_score(struct sched_entity *se) {
@@ -959,7 +959,7 @@ static inline u64 penalty_scale(u64 delta, struct sched_entity *se) {
 static inline u64 preempt_scale(
 	u64 delta, struct sched_entity *curr, struct sched_entity *se) {
 
-	u32 score = max(0, (s32)se->penalty_score - (s32)curr->penalty_score) >> 1;
+	s32 score = max(0, (s32)se->penalty_score - (s32)curr->penalty_score) >> 1;
 	return mul_u64_u32_shr(delta, sched_prio_to_wmult[min(39, 20 + score)], 22);
 }
 
