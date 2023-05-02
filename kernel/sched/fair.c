@@ -138,6 +138,45 @@ unsigned int __read_mostly sched_burst_smoothness     = 1;
 static int three          = 3;
 static int sixty_four     = 64;
 static int maxval_12_bits = 4095;
+
+static inline u32 __calc_bits10(u64 burst_time) {
+	u32 bits = fls64(burst_time);
+	u32 fdigs = likely(bits) ? bits - 1 : 0;
+	return (bits << 10) | (burst_time << (64 - fdigs) >> 54);
+}
+
+static inline u32 __calc_burst_score(u32 bits10, u32 offset) {
+	u32 val10 = max(0, (s32)bits10 - (s32)(offset << 10));
+	return min(39U, val10 * sched_burst_penalty_scale >> 20);
+}
+
+static void update_burst_score(struct sched_entity *se) {
+	u32 bits10 = __calc_bits10(se->max_burst_time);
+	se->penalty_score = __calc_burst_score(bits10, sched_burst_penalty_offset);
+}
+
+static inline u64 penalty_scale(u64 delta, struct sched_entity *se) {
+	return mul_u64_u32_shr(delta, sched_prio_to_wmult[se->penalty_score], 22);
+}
+
+static inline u64 preempt_scale(
+	u64 delta, struct sched_entity *curr, struct sched_entity *se) {
+
+	s32 score = max(0, (s32)se->penalty_score - (s32)curr->penalty_score) >> 1;
+	return mul_u64_u32_shr(delta, sched_prio_to_wmult[min(39, 20 + score)], 22);
+}
+
+static inline u64 binary_smooth(u64 old, u64 new, unsigned int smoothness) {
+	return (new + old * ((1 << smoothness) - 1)) >> smoothness;
+}
+
+static void reset_burst(struct sched_entity *se) {
+	se->prev_burst_time = binary_smooth(
+		se->prev_burst_time, se->burst_time, sched_burst_smoothness);
+	se->burst_time = 0;
+
+	se->max_burst_time = se->prev_burst_time;
+}
 #endif // CONFIG_SCHED_BORE
 
 int sched_thermal_decay_shift;
@@ -934,47 +973,6 @@ static void update_tg_load_avg(struct cfs_rq *cfs_rq)
 {
 }
 #endif /* CONFIG_SMP */
-
-#ifdef CONFIG_SCHED_BORE
-static inline u32 __calc_bits10(u64 burst_time) {
-	u32 bits = fls64(burst_time);
-	u32 fdigs = likely(bits) ? bits - 1 : 0;
-	return (bits << 10) | (burst_time << (64 - fdigs) >> 54);
-}
-
-static inline u32 __calc_burst_score(u32 bits10, u32 offset) {
-	u32 val10 = max(0, (s32)bits10 - (s32)(offset << 10));
-	return min(39U, val10 * sched_burst_penalty_scale >> 20);
-}
-
-static void update_burst_score(struct sched_entity *se) {
-	u32 bits10 = __calc_bits10(se->max_burst_time);
-	se->penalty_score = __calc_burst_score(bits10, sched_burst_penalty_offset);
-}
-
-static inline u64 penalty_scale(u64 delta, struct sched_entity *se) {
-	return mul_u64_u32_shr(delta, sched_prio_to_wmult[se->penalty_score], 22);
-}
-
-static inline u64 preempt_scale(
-	u64 delta, struct sched_entity *curr, struct sched_entity *se) {
-
-	s32 score = max(0, (s32)se->penalty_score - (s32)curr->penalty_score) >> 1;
-	return mul_u64_u32_shr(delta, sched_prio_to_wmult[min(39, 20 + score)], 22);
-}
-
-static inline u64 binary_smooth(u64 old, u64 new, unsigned int smoothness) {
-	return (new + old * ((1 << smoothness) - 1)) >> smoothness;
-}
-
-static void reset_burst(struct sched_entity *se) {
-	se->prev_burst_time = binary_smooth(
-		se->prev_burst_time, se->burst_time, sched_burst_smoothness);
-	se->burst_time = 0;
-
-	se->max_burst_time = se->prev_burst_time;
-}
-#endif // CONFIG_SCHED_BORE
 
 /*
  * Update the current task's runtime statistics.
