@@ -4367,32 +4367,35 @@ int wake_up_state(struct task_struct *p, unsigned int state)
 #ifdef CONFIG_SCHED_BORE
 extern unsigned int sched_burst_cache_lifetime;
 
-static inline void update_burst_cache(struct task_struct *p) {
-	u32 cnt = 0;
-	u64 sum = 0, avg = 0;
+static inline void update_task_child_burst_time_cache(struct task_struct *p) {
+	u32 num_children = 0;
+	u64 sum_burst_time = 0, avg_burst_time = 0;
 	struct task_struct *child;
+
 	list_for_each_entry(child, &p->children, sibling) {
-		cnt++;
-		sum += child->se.max_burst_time >> 8;
+		num_children++;
+		sum_burst_time += child->se.max_burst_time >> 8;
 	}
-	if (cnt) avg = div_u64(sum, cnt) << 8;
-	p->child_burst_cache = max(avg, p->se.max_burst_time);
+
+	if (num_children) avg_burst_time = div_u64(sum_burst_time, num_children) << 8;
+	p->child_burst_cache = max(avg_burst_time, p->se.max_burst_time);
 }
 
-static void adjust_prev_burst(struct task_struct *p) {
+static void update_task_initial_burst_time(struct task_struct *p) {
 	struct task_struct *parent = p->parent;
 	u64 ktime = ktime_to_ns(ktime_get());
 
 	if (likely(parent)) {
 		if (parent->child_burst_last_cached + sched_burst_cache_lifetime < ktime) {
 			parent->child_burst_last_cached = ktime;
-			update_burst_cache(parent);
+			update_task_child_burst_time_cache(parent);
 		}
 		if (p->se.prev_burst_time < parent->child_burst_cache)
 			p->se.prev_burst_time = parent->child_burst_cache;
 	}
+
 	p->se.max_burst_time = p->se.prev_burst_time;
-} 
+}
 #endif // CONFIG_SCHED_BORE
 
 /*
@@ -4629,7 +4632,7 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 {
 	__sched_fork(clone_flags, p);
 #ifdef CONFIG_SCHED_BORE
-	adjust_prev_burst(p);
+	update_task_initial_burst_time(p);
 #endif // CONFIG_SCHED_BORE
 	/*
 	 * We mark the process as NEW here. This guarantees that
