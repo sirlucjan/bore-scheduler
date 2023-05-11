@@ -4394,6 +4394,7 @@ static void update_task_initial_burst_time(struct task_struct *p) {
 			p->se.prev_burst_time = parent->child_burst_cache;
 	}
 
+	p->se.burst_time = 0;
 	p->se.max_burst_time = p->se.prev_burst_time;
 }
 #endif // CONFIG_SCHED_BORE
