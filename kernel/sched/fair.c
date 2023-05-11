@@ -139,20 +139,24 @@ static int three          = 3;
 static int sixty_four     = 64;
 static int maxval_12_bits = 4095;
 
-static inline u32 __calc_bits10(u64 burst_time) {
-	u32 bits = fls64(burst_time);
-	u32 fdigs = likely(bits) ? bits - 1 : 0;
-	return (bits << 10) | (burst_time << (64 - fdigs) >> 54);
-}
-
-static inline u32 __calc_burst_score(u32 bits10, u32 offset) {
-	u32 val10 = max(0, (s32)bits10 - (s32)(offset << 10));
-	return min(39U, val10 * sched_burst_penalty_scale >> 20);
-}
+#define FIXED_SHIFT 10
+#define FIXED_ONE (1 << FIXED_SHIFT)
+typedef u32 fixed;
 
 static void update_burst_score(struct sched_entity *se) {
-	u32 bits10 = __calc_bits10(se->max_burst_time);
-	se->penalty_score = __calc_burst_score(bits10, sched_burst_penalty_offset);
+	u64 burst_time = se->max_burst_time;
+
+	int msb = fls64(burst_time);
+	fixed integer_part = msb << FIXED_SHIFT;
+	fixed fractional_part = burst_time << (64 - msb) << 1 >> (64 - FIXED_SHIFT);
+	fixed greed = integer_part | fractional_part;
+
+	fixed tolerance = sched_burst_penalty_offset << FIXED_SHIFT;
+	fixed penalty = greed > tolerance ? greed - tolerance : 0;
+	fixed scaled_penalty = penalty * sched_burst_penalty_scale >> 10;
+	
+	u8 score = min(39U, scaled_penalty >> FIXED_SHIFT);
+	se->penalty_score = score;
 }
 
 static inline u64 penalty_scale(u64 delta, struct sched_entity *se) {
