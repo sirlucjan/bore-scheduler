@@ -170,7 +170,7 @@ static inline u64 __binary_smooth(u64 new, u64 old, unsigned int smoothness) {
 	return (new + old * ((1 << smoothness) - 1)) >> smoothness;
 }
 
-static void reset_burst(struct sched_entity *se) {
+static void restart_burst(struct sched_entity *se) {
 	se->prev_burst_time = __binary_smooth(
 		se->burst_time, se->prev_burst_time, sched_burst_smoothness);
 	se->burst_time = 0;
@@ -6319,7 +6319,7 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	for_each_sched_entity(se) {
 #ifdef CONFIG_SCHED_BORE
-		if (task_sleep) reset_burst(se);
+		if (task_sleep) restart_burst(se);
 #endif // CONFIG_SCHED_BORE
 		cfs_rq = cfs_rq_of(se);
 		dequeue_entity(cfs_rq, se, flags);
@@ -8044,7 +8044,7 @@ static void yield_task_fair(struct rq *rq)
 	struct cfs_rq *cfs_rq = task_cfs_rq(curr);
 	struct sched_entity *se = &curr->se;
 #ifdef CONFIG_SCHED_BORE
-	reset_burst(se);
+	restart_burst(se);
 #endif // CONFIG_SCHED_BORE
 
 	/*
