@@ -166,15 +166,14 @@ static inline u64 preempt_scale(
 	return mul_u64_u32_shr(delta, sched_prio_to_wmult[min(39, 20 + score)], 22);
 }
 
-static inline u64 binary_smooth(u64 old, u64 new, unsigned int smoothness) {
+static inline u64 __binary_smooth(u64 new, u64 old, unsigned int smoothness) {
 	return (new + old * ((1 << smoothness) - 1)) >> smoothness;
 }
 
 static void reset_burst(struct sched_entity *se) {
-	se->prev_burst_time = binary_smooth(
-		se->prev_burst_time, se->burst_time, sched_burst_smoothness);
+	se->prev_burst_time = __binary_smooth(
+		se->burst_time, se->prev_burst_time, sched_burst_smoothness);
 	se->burst_time = 0;
-
 	se->max_burst_time = se->prev_burst_time;
 }
 #endif // CONFIG_SCHED_BORE
