@@ -1004,7 +1004,8 @@ static void update_curr(struct cfs_rq *cfs_rq)
 
 #ifdef CONFIG_SCHED_BORE
 	curr->burst_time += delta_exec;
-	curr->max_burst_time = max(curr->max_burst_time, curr->burst_time);
+	if (curr->max_burst_time < curr->burst_time)
+		curr->max_burst_time = curr->burst_time;
 	update_burst_score(curr);
 	if (sched_bore & 1)
 		curr->vruntime += penalty_scale(calc_delta_fair(delta_exec, curr), curr);
