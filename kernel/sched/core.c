@@ -4368,34 +4368,33 @@ int wake_up_state(struct task_struct *p, unsigned int state)
 extern unsigned int sched_burst_cache_lifetime;
 
 static inline void update_task_child_burst_time_cache(struct task_struct *p) {
-	u32 num_children = 0;
+	u32 num_child = 0;
 	u64 sum_burst_time = 0, avg_burst_time = 0;
 	struct task_struct *child;
 
 	list_for_each_entry(child, &p->children, sibling) {
-		num_children++;
+		num_child++;
 		sum_burst_time += child->se.max_burst_time >> 8;
 	}
 
-	if (num_children) avg_burst_time = div_u64(sum_burst_time, num_children) << 8;
+	if (num_child) avg_burst_time = div_u64(sum_burst_time, num_child) << 8;
 	p->child_burst_cache = max(avg_burst_time, p->se.max_burst_time);
 }
 
-static void update_task_initial_burst_time(struct task_struct *p) {
-	struct task_struct *parent = p->parent;
+static void update_task_initial_burst_time(struct task_struct *task) {
+	struct sched_entity *se = &task->se;
+	struct task_struct *p = task->parent;
 	u64 ktime = ktime_to_ns(ktime_get());
 
-	if (likely(parent)) {
-		if (parent->child_burst_last_cached + sched_burst_cache_lifetime < ktime) {
-			parent->child_burst_last_cached = ktime;
-			update_task_child_burst_time_cache(parent);
+	if (likely(p)) {
+		if (p->child_burst_last_cached + sched_burst_cache_lifetime < ktime) {
+			p->child_burst_last_cached = ktime;
+			update_task_child_burst_time_cache(p);
 		}
-		if (p->se.prev_burst_time < parent->child_burst_cache)
-			p->se.prev_burst_time = parent->child_burst_cache;
+		se->prev_burst_time = max(se->prev_burst_time, p->child_burst_cache);
 	}
 
-	p->se.burst_time = 0;
-	p->se.max_burst_time = p->se.prev_burst_time;
+	se->max_burst_time = se->prev_burst_time;
 }
 #endif // CONFIG_SCHED_BORE
 

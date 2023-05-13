@@ -152,7 +152,7 @@ static void update_burst_score(struct sched_entity *se) {
 	fixed greed = integer_part | fractional_part;
 
 	fixed tolerance = sched_burst_penalty_offset << FIXED_SHIFT;
-	fixed penalty = greed > tolerance ? greed - tolerance : 0;
+	fixed penalty = max(0, (s32)greed - (s32)tolerance);
 	fixed scaled_penalty = penalty * sched_burst_penalty_scale >> 10;
 	
 	u8 score = min(39U, scaled_penalty >> FIXED_SHIFT);
@@ -1008,8 +1008,7 @@ static void update_curr(struct cfs_rq *cfs_rq)
 
 #ifdef CONFIG_SCHED_BORE
 	curr->burst_time += delta_exec;
-	if (curr->max_burst_time < curr->burst_time)
-		curr->max_burst_time = curr->burst_time;
+	curr->max_burst_time = max(curr->max_burst_time, curr->burst_time);
 	update_burst_score(curr);
 	if (sched_bore & 1)
 		curr->vruntime += penalty_scale(calc_delta_fair(delta_exec, curr), curr);
