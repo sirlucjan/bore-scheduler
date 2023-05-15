@@ -174,11 +174,10 @@ static inline u64 __binary_smooth(u64 new, u64 old, unsigned int smoothness) {
 	return (new + old * ((1 << smoothness) - 1)) >> smoothness;
 }
 
-static void restart_burst(struct sched_entity *se) {
-	se->prev_burst_time = __binary_smooth(
+void restart_burst(struct sched_entity *se) {
+	se->max_burst_time = se->prev_burst_time = __binary_smooth(
 		se->burst_time, se->prev_burst_time, sched_burst_smoothness);
 	se->burst_time = 0;
-	se->max_burst_time = se->prev_burst_time;
 }
 #endif // CONFIG_SCHED_BORE
 
