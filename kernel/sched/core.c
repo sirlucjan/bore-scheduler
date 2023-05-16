@@ -4417,6 +4417,8 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->se.nr_migrations		= 0;
 	p->se.vruntime			= 0;
 #ifdef CONFIG_SCHED_BORE
+	p->child_burst_cache = 0;
+	p->child_burst_last_cached = 0;
 	p->se.burst_time      = 0;
 #endif // CONFIG_SCHED_BORE
 	INIT_LIST_HEAD(&p->se.group_node);
