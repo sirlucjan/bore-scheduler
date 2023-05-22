@@ -4385,7 +4385,7 @@ static inline void update_task_child_burst_time_cache(struct task_struct *p) {
 
 static void update_task_initial_burst_time(struct task_struct *task) {
 	struct sched_entity *se = &task->se;
-	struct task_struct *p = task->parent;
+	struct task_struct *p = task->real_parent;
 	u64 ktime = ktime_to_ns(ktime_get());
 
 	if (likely(p)) {
