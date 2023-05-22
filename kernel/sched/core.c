@@ -4367,6 +4367,20 @@ int wake_up_state(struct task_struct *p, unsigned int state)
 #ifdef CONFIG_SCHED_BORE
 extern unsigned int sched_burst_cache_lifetime;
 
+void __init sched_init_bore(void) {
+	init_task.child_burst_cache = 0;
+	init_task.child_burst_last_cached = 0;
+	init_task.se.prev_burst_time = 0;
+	init_task.se.burst_time = 0;
+	init_task.se.max_burst_time = 0;
+}
+
+void inline __sched_fork_bore(struct task_struct *p) {
+	p->child_burst_cache = 0;
+	p->child_burst_last_cached = 0;
+	p->se.burst_time = 0;
+}
+
 static inline void update_task_child_burst_time_cache(struct task_struct *p) {
 	u32 num_child = 0;
 	u64 sum_burst_time = 0, avg_burst_time = 0;
@@ -4417,9 +4431,7 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->se.nr_migrations		= 0;
 	p->se.vruntime			= 0;
 #ifdef CONFIG_SCHED_BORE
-	p->child_burst_cache = 0;
-	p->child_burst_last_cached = 0;
-	p->se.burst_time      = 0;
+	__sched_fork_bore(p);
 #endif // CONFIG_SCHED_BORE
 	INIT_LIST_HEAD(&p->se.group_node);
 
@@ -9051,10 +9063,6 @@ void __init init_idle(struct task_struct *idle, int cpu)
 
 	idle->__state = TASK_RUNNING;
 	idle->se.exec_start = sched_clock();
-#ifdef CONFIG_SCHED_BORE
-	idle->se.prev_burst_time = 0;
-	idle->se.max_burst_time = 0;
-#endif //CONFIG_SCHED_BORE
 	/*
 	 * PF_KTHREAD should already be set at this point; regardless, make it
 	 * look like a proper per-CPU kthread.
@@ -9723,6 +9731,7 @@ void __init sched_init(void)
 #endif
 
 #ifdef CONFIG_SCHED_BORE
+	sched_init_bore();
 	printk(KERN_INFO "BORE (Burst-Oriented Response Enhancer) CPU Scheduler modification 2.2.7 by Masahito Suzuki");
 #endif // CONFIG_SCHED_BORE
 
