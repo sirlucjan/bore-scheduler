@@ -4365,6 +4365,7 @@ int wake_up_state(struct task_struct *p, unsigned int state)
 }
 
 #ifdef CONFIG_SCHED_BORE
+#define CHILD_BURST_CUTOFF_BITS 9
 extern unsigned int sched_burst_cache_lifetime;
 
 void __init sched_init_bore(void) {
@@ -4382,18 +4383,18 @@ void inline __sched_fork_bore(struct task_struct *p) {
 }
 
 static inline void update_task_child_burst_time_cache(struct task_struct *p) {
-	u32 num_child = 0;
-	u64 sum_burst_time = 0, avg_burst_time = 0;
+	u64 sum = 0, avg_burst_time = 0;
+	u32 cnt = 0;
 	struct task_struct *child;
 
 	read_lock(&tasklist_lock);
 	list_for_each_entry(child, &p->children, sibling) {
-		num_child++;
-		sum_burst_time += child->se.max_burst_time >> 8;
+		cnt++;
+		sum += child->se.max_burst_time >> CHILD_BURST_CUTOFF_BITS;
 	}
 	read_unlock(&tasklist_lock);
 
-	if (num_child) avg_burst_time = div_u64(sum_burst_time, num_child) << 8;
+	if (cnt) avg_burst_time = div_u64(sum, cnt) << CHILD_BURST_CUTOFF_BITS;
 	p->child_burst_cache = max(avg_burst_time, p->se.max_burst_time);
 }
 
