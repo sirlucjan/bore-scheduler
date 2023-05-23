@@ -4400,15 +4400,15 @@ static inline void update_task_child_burst_time_cache(struct task_struct *p) {
 
 static void update_task_initial_burst_time(struct task_struct *task) {
 	struct sched_entity *se = &task->se;
-	struct task_struct *p = task->real_parent;
+	struct task_struct *par = task->real_parent;
 	u64 ktime = ktime_to_ns(ktime_get());
 
-	if (likely(p)) {
-		if (p->child_burst_last_cached + sched_burst_cache_lifetime < ktime) {
-			p->child_burst_last_cached = ktime;
-			update_task_child_burst_time_cache(p);
+	if (likely(par)) {
+		if (par->child_burst_last_cached + sched_burst_cache_lifetime < ktime) {
+			par->child_burst_last_cached = ktime;
+			update_task_child_burst_time_cache(par);
 		}
-		se->prev_burst_time = max(se->prev_burst_time, p->child_burst_cache);
+		se->prev_burst_time = max(se->prev_burst_time, par->child_burst_cache);
 	}
 
 	se->max_burst_time = se->prev_burst_time;
