@@ -130,7 +130,7 @@ static unsigned int normalized_sysctl_sched_wakeup_granularity	= 1000000UL;
 const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
 
 #ifdef CONFIG_SCHED_BORE
-unsigned int __read_mostly sched_bore                 = 3;
+unsigned int __read_mostly sched_bore                 = 1;
 unsigned int __read_mostly sched_burst_cache_lifetime = 15000000;
 unsigned int __read_mostly sched_burst_penalty_offset = 12;
 unsigned int __read_mostly sched_burst_penalty_scale  = 1292;
@@ -246,7 +246,7 @@ static struct ctl_table sched_fair_sysctls[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_minmax,
 		.extra1		= SYSCTL_ZERO,
-		.extra2		= &three,
+		.extra2		= SYSCTL_ONE,
 	},
 	{
 		.procname	= "sched_burst_cache_lifetime",
@@ -1020,7 +1020,7 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	curr->burst_time += delta_exec;
 	curr->max_burst_time = max(curr->max_burst_time, curr->burst_time);
 	update_burst_score(curr);
-	if (sched_bore & 1)
+	if (sched_bore)
 		curr->vruntime += penalty_scale(calc_delta_fair(delta_exec, curr), curr);
 	else
 #endif // CONFIG_SCHED_BORE
@@ -7682,7 +7682,7 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 {
 	s64 gran, vdiff = curr->vruntime - se->vruntime;
 #ifdef CONFIG_SCHED_BORE
-	if (sched_bore & 3) {
+	if (sched_bore) {
 		u64 rtime = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
 		vdiff += wakeup_preempt_backstep_delta(rtime, curr)
 		       - wakeup_preempt_backstep_delta(rtime, se);
