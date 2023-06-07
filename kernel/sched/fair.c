@@ -7670,7 +7670,11 @@ static unsigned long wakeup_gran(struct sched_entity *se)
 	 * This is especially important for buddies when the leftmost
 	 * task is higher priority than the buddy.
 	 */
+#ifdef CONFIG_SCHED_BORE
 	return calc_delta_fair_unscaled(gran, se);
+#else // CONFIG_SCHED_BORE
+	return calc_delta_fair(gran, se);
+#endif // CONFIG_SCHED_BORE
 }
 
 /*
