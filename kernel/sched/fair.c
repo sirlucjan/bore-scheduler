@@ -791,11 +791,22 @@ int sched_update_scaling(void)
 /*
  * delta /= w
  */
+#ifdef CONFIG_SCHED_BORE
+#define calc_delta_fair(delta, se) __calc_delta_fair(delta, se, true)
+#define calc_delta_fair_unscaled(delta, se) __calc_delta_fair(delta, se, false)
+
+static inline u64 
+__calc_delta_fair(u64 delta, struct sched_entity *se, bool bscale)
+#else // CONFIG_SCHED_BORE
 static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
+#endif // CONFIG_SCHED_BORE
 {
 	if (unlikely(se->load.weight != NICE_0_LOAD))
 		delta = __calc_delta(delta, NICE_0_LOAD, &se->load);
 
+#ifdef CONFIG_SCHED_BORE
+	if (bscale && sched_bore) delta = penalty_scale(delta, se);
+#endif // CONFIG_SCHED_BORE
 	return delta;
 }
 
@@ -7666,7 +7677,7 @@ static unsigned long wakeup_gran(struct sched_entity *se)
 	 * This is especially important for buddies when the leftmost
 	 * task is higher priority than the buddy.
 	 */
-	return calc_delta_fair(gran, se);
+	return calc_delta_fair_unscaled(gran, se);
 }
 
 /*
