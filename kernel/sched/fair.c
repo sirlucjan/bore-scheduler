@@ -5107,14 +5107,8 @@ set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 	se->prev_sum_exec_runtime = se->sum_exec_runtime;
 }
 
-#ifdef CONFIG_SCHED_BORE
-static int
-wakeup_preempt_entity_bscale(struct sched_entity *curr,
-                             struct sched_entity *se, bool do_scale);
-#else // CONFIG_SCHED_BORE
 static int
 wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
-#endif // CONFIG_SCHED_BORE
 
 /*
  * Pick the next process, keeping these things in mind, in this order:
@@ -5153,33 +5147,18 @@ pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 				second = curr;
 		}
 
-#ifdef CONFIG_SCHED_BORE
-		if (second && wakeup_preempt_entity_bscale(
-			second, left, sched_bore & 2) < 1)
-#else // CONFIG_SCHED_BORE
 		if (second && wakeup_preempt_entity(second, left) < 1)
-#endif // CONFIG_SCHED_BORE
 			se = second;
 	}
 
-#ifdef CONFIG_SCHED_BORE
-	if (cfs_rq->next && wakeup_preempt_entity_bscale(
-		cfs_rq->next, left, sched_bore & 2) < 1)
-#else // CONFIG_SCHED_BORE
 	if (cfs_rq->next && wakeup_preempt_entity(cfs_rq->next, left) < 1)
-#endif // CONFIG_SCHED_BORE
 	{
 		/*
 		 * Someone really wants this to run. If it's not unfair, run it.
 		 */
 		se = cfs_rq->next;
 	}
-#ifdef CONFIG_SCHED_BORE
-	else if (cfs_rq->last && wakeup_preempt_entity_bscale(
-		cfs_rq->last, left, sched_bore & 2) < 1)
-#else // CONFIG_SCHED_BORE
 	else if (cfs_rq->last && wakeup_preempt_entity(cfs_rq->last, left) < 1)
-#endif // CONFIG_SCHED_BORE
 	{
 		/*
 		 * Prefer last buddy, try to return the CPU to a preempted task.
@@ -7692,16 +7671,11 @@ static unsigned long wakeup_gran(struct sched_entity *se)
  *
  */
 static int
-#ifdef CONFIG_SCHED_BORE
-wakeup_preempt_entity_bscale(struct sched_entity *curr,
-                             struct sched_entity *se, bool do_scale)
-#else // CONFIG_SCHED_BORE
 wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
-#endif // CONFIG_SCHED_BORE
 {
 	s64 gran, vdiff = curr->vruntime - se->vruntime;
 #ifdef CONFIG_SCHED_BORE
-	if (do_scale && sched_bore) {
+	if (sched_bore & 2) {
 		u64 rtime = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
 		u64 delta = calc_delta_fair_unscaled(rtime, curr);
 		vdiff += delta - penalty_scale(delta, curr);
@@ -7816,11 +7790,7 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int wake_
 		return;
 
 	update_curr(cfs_rq_of(se));
-#ifdef CONFIG_SCHED_BORE
-	if (wakeup_preempt_entity_bscale(se, pse, sched_bore & 2) == 1)
-#else // CONFIG_SCHED_BORE
 	if (wakeup_preempt_entity(se, pse) == 1)
-#endif // CONFIG_SCHED_BORE
 	{
 		/*
 		 * Bias pick_next to pick the sched entity that is
