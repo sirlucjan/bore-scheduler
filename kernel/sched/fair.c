@@ -163,13 +163,6 @@ static inline u64 penalty_scale(u64 delta, struct sched_entity *se) {
 	return mul_u64_u32_shr(delta, sched_prio_to_wmult[se->penalty_score], 22);
 }
 
-static inline u64 preempt_scale(
-	u64 delta, struct sched_entity *curr, struct sched_entity *se) {
-
-	s32 score = max(0, (s32)se->penalty_score - (s32)curr->penalty_score) >> 1;
-	return mul_u64_u32_shr(delta, sched_prio_to_wmult[min(39, 20 + score)], 22);
-}
-
 static inline u64 __binary_smooth(u64 new, u64 old, unsigned int smoothness) {
 	return (new + old * ((1 << smoothness) - 1)) >> smoothness;
 }
@@ -7703,14 +7696,18 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 #endif // CONFIG_SCHED_BORE
 {
 	s64 gran, vdiff = curr->vruntime - se->vruntime;
+#ifdef CONFIG_SCHED_BORE
+	if (do_scale && sched_bore) {
+		u64 rtime = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
+		u64 delta = calc_delta_fair_unscaled(rtime, curr);
+		vdiff += delta - penalty_scale(delta, curr);
+	}
+#endif // CONFIG_SCHED_BORE
 
 	if (vdiff <= 0)
 		return -1;
 
 	gran = wakeup_gran(se);
-#ifdef CONFIG_SCHED_BORE
-	if (do_scale) gran = preempt_scale(gran, curr, se);
-#endif // CONFIG_SCHED_BORE
 	if (vdiff > gran)
 		return 1;
 
