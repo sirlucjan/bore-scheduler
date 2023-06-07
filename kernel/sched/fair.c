@@ -172,6 +172,16 @@ void restart_burst(struct sched_entity *se) {
 		se->burst_time, se->prev_burst_time, sched_burst_smoothness);
 	se->burst_time = 0;
 }
+
+#define calc_delta_fair(delta, se) __calc_delta_fair(delta, se, true)
+#define calc_delta_fair_unscaled(delta, se) __calc_delta_fair(delta, se, false)
+static inline u64 
+__calc_delta_fair(u64 delta, struct sched_entity *se, bool bscale);
+
+static s64 wakeup_preempt_backstep_delta(u64 rtime, struct sched_entity *se) {
+	u64 delta = calc_delta_fair_unscaled(rtime, se);
+	return delta - penalty_scale(delta, se);
+}
 #endif // CONFIG_SCHED_BORE
 
 int sched_thermal_decay_shift;
@@ -785,9 +795,6 @@ int sched_update_scaling(void)
  * delta /= w
  */
 #ifdef CONFIG_SCHED_BORE
-#define calc_delta_fair(delta, se) __calc_delta_fair(delta, se, true)
-#define calc_delta_fair_unscaled(delta, se) __calc_delta_fair(delta, se, false)
-
 static inline u64 
 __calc_delta_fair(u64 delta, struct sched_entity *se, bool bscale)
 #else // CONFIG_SCHED_BORE
@@ -7675,10 +7682,10 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 {
 	s64 gran, vdiff = curr->vruntime - se->vruntime;
 #ifdef CONFIG_SCHED_BORE
-	if (sched_bore & 2) {
+	if (sched_bore & 3) {
 		u64 rtime = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
-		u64 delta = calc_delta_fair_unscaled(rtime, curr);
-		vdiff += delta - penalty_scale(delta, curr);
+		vdiff += wakeup_preempt_backstep_delta(rtime, curr)
+		       - wakeup_preempt_backstep_delta(rtime, se);
 	}
 #endif // CONFIG_SCHED_BORE
 
