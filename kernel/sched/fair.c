@@ -805,7 +805,7 @@ static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
 		delta = __calc_delta(delta, NICE_0_LOAD, &se->load);
 
 #ifdef CONFIG_SCHED_BORE
-	if (bscale && sched_bore) delta = penalty_scale(delta, se);
+	if (bscale && likely(sched_bore)) delta = penalty_scale(delta, se);
 #endif // CONFIG_SCHED_BORE
 	return delta;
 }
@@ -1020,7 +1020,7 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	curr->burst_time += delta_exec;
 	curr->max_burst_time = max(curr->max_burst_time, curr->burst_time);
 	update_burst_score(curr);
-	if (sched_bore)
+	if (likely(sched_bore))
 		curr->vruntime += penalty_scale(calc_delta_fair(delta_exec, curr), curr);
 	else
 #endif // CONFIG_SCHED_BORE
@@ -7679,7 +7679,7 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 {
 	s64 gran, vdiff = curr->vruntime - se->vruntime;
 #ifdef CONFIG_SCHED_BORE
-	if (sched_bore) {
+	if (likely(sched_bore)) {
 		u64 rtime = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
 		vdiff += wakeup_preempt_backstep_delta(rtime, curr)
 		       - wakeup_preempt_backstep_delta(rtime, se);
