@@ -4401,11 +4401,11 @@ static inline void update_task_child_burst_time_cache(struct task_struct *p) {
 static void update_task_initial_burst_time(struct task_struct *task) {
 	struct sched_entity *se = &task->se;
 	struct task_struct *par = task->real_parent;
-	u64 ktime = ktime_to_ns(ktime_get());
+	u64 now = ktime_get_ns();
 
 	if (likely(par)) {
-		if (par->child_burst_last_cached + sched_burst_cache_lifetime < ktime) {
-			par->child_burst_last_cached = ktime;
+		if (par->child_burst_last_cached + sched_burst_cache_lifetime < now) {
+			par->child_burst_last_cached = now;
 			update_task_child_burst_time_cache(par);
 		}
 		se->prev_burst_time = max(se->prev_burst_time, par->child_burst_cache);
