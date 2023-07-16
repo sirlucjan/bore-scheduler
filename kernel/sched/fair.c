@@ -131,10 +131,11 @@ const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
 
 #ifdef CONFIG_SCHED_BORE
 unsigned int __read_mostly sched_bore                 = 1;
-unsigned int __read_mostly sched_burst_cache_lifetime = 15000000;
+unsigned int __read_mostly sched_burst_cache_lifetime = 60000000;
 unsigned int __read_mostly sched_burst_penalty_offset = 18;
 unsigned int __read_mostly sched_burst_penalty_scale  = 1292;
 unsigned int __read_mostly sched_burst_smoothness     = 1;
+unsigned int __read_mostly sched_burst_fork_atavistic = 1;
 static int three          = 3;
 static int sixty_four     = 64;
 static int maxval_12_bits = 4095;
@@ -254,6 +255,15 @@ static struct ctl_table sched_fair_sysctls[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler = proc_dointvec,
+	},
+	{
+		.procname	= "sched_burst_fork_atavistic",
+		.data		= &sched_burst_fork_atavistic,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
 	},
 	{
 		.procname	= "sched_burst_penalty_offset",
