@@ -4376,7 +4376,7 @@ void __init sched_init_bore(void) {
 	init_task.se.max_burst_time = 0;
 }
 
-void inline __sched_fork_bore(struct task_struct *p) {
+void inline sched_post_fork_bore(struct task_struct *p) {
 	p->child_burst_cache = 0;
 	p->child_burst_last_cached = 0;
 	p->se.burst_time = 0;
@@ -4432,7 +4432,7 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->se.nr_migrations		= 0;
 	p->se.vruntime			= 0;
 #ifdef CONFIG_SCHED_BORE
-	__sched_fork_bore(p);
+	sched_post_fork_bore(p);
 #endif // CONFIG_SCHED_BORE
 	INIT_LIST_HEAD(&p->se.group_node);
 
@@ -4648,9 +4648,6 @@ late_initcall(sched_core_sysctl_init);
 int sched_fork(unsigned long clone_flags, struct task_struct *p)
 {
 	__sched_fork(clone_flags, p);
-#ifdef CONFIG_SCHED_BORE
-	update_task_initial_burst_time(p);
-#endif // CONFIG_SCHED_BORE
 	/*
 	 * We mark the process as NEW here. This guarantees that
 	 * nobody will actually run it, and a signal or other external
@@ -4742,6 +4739,10 @@ void sched_cgroup_fork(struct task_struct *p, struct kernel_clone_args *kargs)
 
 void sched_post_fork(struct task_struct *p)
 {
+#ifdef CONFIG_SCHED_BORE
+	sched_post_fork_bore(p);
+	update_task_initial_burst_time(p);
+#endif // CONFIG_SCHED_BORE
 	uclamp_post_fork(p);
 }
 
