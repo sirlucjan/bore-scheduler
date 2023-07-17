@@ -135,7 +135,7 @@ unsigned int __read_mostly sched_burst_cache_lifetime = 60000000;
 unsigned int __read_mostly sched_burst_penalty_offset = 12;
 unsigned int __read_mostly sched_burst_penalty_scale  = 1292;
 unsigned int __read_mostly sched_burst_smoothness     = 1;
-unsigned int __read_mostly sched_burst_fork_atavistic = 1;
+unsigned int __read_mostly sched_burst_fork_atavistic = 2;
 static int three          = 3;
 static int sixty_four     = 64;
 static int maxval_12_bits = 4095;
@@ -263,7 +263,7 @@ static struct ctl_table sched_fair_sysctls[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_minmax,
 		.extra1		= SYSCTL_ZERO,
-		.extra2		= SYSCTL_ONE,
+		.extra2		= &three,
 	},
 	{
 		.procname	= "sched_burst_penalty_offset",

@@ -4394,41 +4394,52 @@ static inline bool child_burst_cache_expired(struct task_struct *p, u64 now) {
 	return (p->child_burst_last_cached + sched_burst_cache_lifetime < now);
 }
 
-static void
-update_child_burst_cache(struct task_struct *p, u64 now, u32 *acnt, u64 *asum) {
+static void __update_child_burst_cache(
+	struct task_struct *p, u32 cnt, u64 sum, u64 now) {
+	u64 avg = 0;
+	if (cnt) avg = div_u64(sum, cnt) << CHILD_BURST_CUTOFF_BITS;
+	p->child_burst_cache = max(avg, p->se.max_burst_time);
+	p->child_burst_last_cached = now;
+}
+
+static void update_child_burst_cache(struct task_struct *p, u64 now) {
+	struct task_struct *child;
+	u32 cnt = 0;
+	u64 sum = 0;
+
+	list_for_each_entry(child, &p->children, sibling) {
+		cnt++;
+		sum += child->se.max_burst_time >> CHILD_BURST_CUTOFF_BITS;
+	}
+
+	__update_child_burst_cache(p, cnt, sum, now);
+}
+
+static void update_child_burst_cache_atavistic(
+	struct task_struct *p, u64 now, u32 depth, u32 *acnt, u64 *asum) {
 	struct task_struct *child, *dec;
 	u32 cnt = 0, dcnt = 0;
-	u64 sum = 0, avg = 0;
+	u64 sum = 0;
 
-	if (!sched_burst_fork_atavistic) {
-		list_for_each_entry(child, &p->children, sibling) {
+	list_for_each_entry(child, &p->children, sibling) {
+		dec = child;
+		while ((dcnt = count_child_tasks(dec)) == 1)
+			dec = list_first_entry(&dec->children, struct task_struct, sibling);
+		
+		if (!dcnt || !depth) {
 			cnt++;
-			sum += child->se.max_burst_time >> CHILD_BURST_CUTOFF_BITS;
-		}
-	} else {
-		list_for_each_entry(child, &p->children, sibling) {
-			dec = child;
-			while ((dcnt = count_child_tasks(dec)) == 1)
-				dec = list_first_entry(&dec->children, struct task_struct, sibling);
-			
-			if (!dcnt) {
-				cnt++;
-				sum += dec->se.max_burst_time >> CHILD_BURST_CUTOFF_BITS;
-			} else {
-				if (child_burst_cache_expired(dec, now))
-					update_child_burst_cache(dec, now, &cnt, &sum);
-				else {
-					cnt += dcnt;
-					sum += (dec->child_burst_cache >> CHILD_BURST_CUTOFF_BITS) * dcnt;
-				}
+			sum += dec->se.max_burst_time >> CHILD_BURST_CUTOFF_BITS;
+		} else {
+			if (child_burst_cache_expired(dec, now))
+				update_child_burst_cache_atavistic(dec, now, depth - 1, &cnt, &sum);
+			else {
+				cnt += dcnt;
+				sum += (dec->child_burst_cache >> CHILD_BURST_CUTOFF_BITS) * dcnt;
 			}
 		}
 	}
 
-	if (cnt) avg = div_u64(sum, cnt) << CHILD_BURST_CUTOFF_BITS;
-	p->child_burst_cache = max(avg, p->se.max_burst_time);
-	p->child_burst_last_cached = now;
-
+	__update_child_burst_cache(p, cnt, sum, now);
 	*acnt += cnt;
 	*asum += sum;
 }
@@ -4442,13 +4453,15 @@ static void update_task_initial_burst_time(struct task_struct *p) {
 
 	read_lock(&tasklist_lock);
 	
-	if (sched_burst_fork_atavistic)
+	if (sched_burst_fork_atavistic) {
 		while ((anc->real_parent != anc) && (count_child_tasks(anc) == 1))
 			anc = anc->real_parent;
-
-	if (child_burst_cache_expired(anc, now)) {
-		update_child_burst_cache(anc, now, &cnt, &sum);
-	}
+		if (child_burst_cache_expired(anc, now))
+			update_child_burst_cache_atavistic(
+				anc, now, sched_burst_fork_atavistic, &cnt, &sum);
+	} else
+		if (child_burst_cache_expired(anc, now))
+			update_child_burst_cache(anc, now);
 
 	read_unlock(&tasklist_lock);
 
