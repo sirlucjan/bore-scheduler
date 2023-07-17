@@ -4408,23 +4408,18 @@ update_child_burst_cache(struct task_struct *p, u64 now, u32 *acnt, u64 *asum) {
 	} else {
 		list_for_each_entry(child, &p->children, sibling) {
 			dec = child;
-			while(true){
-				dcnt = count_child_tasks(dec);
-				if (dcnt == 0) {
-					cnt++;
-					sum += dec->se.max_burst_time >> CHILD_BURST_CUTOFF_BITS;
-					break;
-				} else if (dcnt == 1) {
-					dec = list_first_entry(&dec->children, struct task_struct, sibling);
-					continue;
-				} else {
-					if (child_burst_cache_expired(dec, now))
-						update_child_burst_cache(dec, now, &cnt, &sum);
-					else {
-						cnt += dcnt;
-						sum += (dec->child_burst_cache >> CHILD_BURST_CUTOFF_BITS) * dcnt;
-					}
-					break;
+			while ((dcnt = count_child_tasks(dec)) == 1)
+				dec = list_first_entry(&dec->children, struct task_struct, sibling);
+			
+			if (!dcnt) {
+				cnt++;
+				sum += dec->se.max_burst_time >> CHILD_BURST_CUTOFF_BITS;
+			} else {
+				if (child_burst_cache_expired(dec, now))
+					update_child_burst_cache(dec, now, &cnt, &sum);
+				else {
+					cnt += dcnt;
+					sum += (dec->child_burst_cache >> CHILD_BURST_CUTOFF_BITS) * dcnt;
 				}
 			}
 		}
