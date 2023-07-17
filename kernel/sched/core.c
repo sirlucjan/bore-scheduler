@@ -4466,7 +4466,7 @@ static void update_task_initial_burst_time(struct task_struct *p) {
 	read_unlock(&tasklist_lock);
 
 	se->max_burst_time = se->prev_burst_time =
-		max(p->se.prev_burst_time, anc->child_burst_cache);
+		max(se->prev_burst_time, anc->child_burst_cache);
 }
 #endif // CONFIG_SCHED_BORE
 
